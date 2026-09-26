@@ -37,7 +37,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements*.txt
       - run: pip install -r backend/requirements-dev.txt
-      - run: ruff check backend && ruff format --check backend
+      - run: flake8 backend
       - run: python backend/manage.py check
       - run: python backend/manage.py makemigrations --check --dry-run
       - run: python backend/manage.py test tests --verbosity 2
