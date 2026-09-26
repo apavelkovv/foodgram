@@ -1,0 +1,136 @@
+name: Foodgram CI and deployment
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: foodgram_test
+          POSTGRES_USER: foodgram
+          POSTGRES_PASSWORD: test-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U foodgram -d foodgram_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DEBUG: 'True'
+      USE_SQLITE: 'False'
+      POSTGRES_DB: foodgram_test
+      POSTGRES_USER: foodgram
+      POSTGRES_PASSWORD: test-only-password
+      DB_HOST: 127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r backend/requirements-dev.txt
+      - run: ruff check backend && ruff format --check backend
+      - run: python backend/manage.py check
+      - run: python backend/manage.py makemigrations --check --dry-run
+      - run: python backend/manage.py test tests --verbosity 2
+      - run: cp .env.example .env && docker compose -f infra/docker-compose.yml config --quiet
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund && npm run build
+        working-directory: frontend
+        env:
+          CI: 'false'
+
+      - name: API contract (Postman)
+        run: |
+          python backend/manage.py migrate --noinput
+          python backend/manage.py import_catalog
+          python backend/manage.py runserver 127.0.0.1:8000 --noreload > /tmp/foodgram-api.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/tags/ > /dev/null; then break; fi
+            sleep 1
+          done
+          npx --yes newman@6.2.2 run postman_collection/foodgram.postman_collection.json --env-var baseUrl=http://127.0.0.1:8000
+
+  images:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - component: backend
+            context: .
+            dockerfile: backend/Dockerfile
+          - component: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+          - component: nginx
+            context: .
+            dockerfile: infra/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Image prefix
+        id: image
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+        run: echo "prefix=${DOCKERHUB_USERNAME}/foodgram" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.image.outputs.prefix }}-${{ matrix.component }}:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-${{ matrix.component }}:latest
+
+  deploy:
+    needs: images
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: foodgram-production
+      cancel-in-progress: false
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_KEY: ${{ secrets.SSH_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy
+        run: |
+          ssh "$SSH_USER@$SSH_HOST" 'mkdir -p ~/foodgram'
+          scp docker-compose.production.yml infra/deploy.sh "$SSH_USER@$SSH_HOST:foodgram/"
+          PREFIX="${DOCKERHUB_USERNAME}/foodgram"
+          ssh "$SSH_USER@$SSH_HOST" "cd ~/foodgram && IMAGE_PREFIX='$PREFIX' IMAGE_TAG='$GITHUB_SHA' sh deploy.sh"

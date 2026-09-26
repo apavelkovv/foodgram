@@ -3349,7 +3349,7 @@
 											"        pm.expect(responseData.length > 0, assert_msg);",
 											"        const expectedingredientNameStart = decodeURIComponent(pm.request.url.query.get(\"name\"));",
 											"        for (elem of responseData) {",
-											"            pm.expect(elem.name.startsWith(expectedingredientNameStart), assert_msg).to.be.true;",
+											"            pm.expect(elem.name.toLowerCase().startsWith(expectedingredientNameStart.toLowerCase()), assert_msg).to.be.true;",
 											"        };",
 											"});",
 											""

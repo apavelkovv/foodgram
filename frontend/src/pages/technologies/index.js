@@ -1,4 +1,4 @@
-import { Title, Container, Main } from '../../components'
+import { Container, Main } from '../../components'
 import styles from './styles.module.css'
 import MetaTags from 'react-meta-tags'
 
@@ -6,9 +6,9 @@ const Technologies = () => {
   
   return <Main>
     <MetaTags>
-      <title>О проекте</title>
+      <title>Технологии</title>
       <meta name="description" content="Фудграм - Технологии" />
-      <meta property="og:title" content="О проекте" />
+      <meta property="og:title" content="Технологии" />
     </MetaTags>
     
     <Container>
@@ -28,7 +28,7 @@ const Technologies = () => {
                 Django REST Framework
               </li>
               <li className={styles.textItem}>
-                Djoser
+                Djoser, PostgreSQL, Docker и nginx
               </li>
             </ul>
           </div>
