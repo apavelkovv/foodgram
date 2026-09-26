@@ -50,7 +50,8 @@ class Recipe(models.Model):
         validators=[MinValueValidator(1)],
     )
     created_at = models.DateTimeField('Дата публикации', auto_now_add=True)
-    tags = models.ManyToManyField(Tag, related_name='recipes', verbose_name='Теги')
+    tags = models.ManyToManyField(
+        Tag, related_name='recipes', verbose_name='Теги')
     ingredients = models.ManyToManyField(
         Ingredient,
         through='RecipeIngredient',
@@ -62,7 +63,8 @@ class Recipe(models.Model):
         ordering = ('-created_at', '-id')
         verbose_name = 'Рецепт'
         verbose_name_plural = 'Рецепты'
-        indexes = [models.Index(fields=('-created_at', '-id'), name='recipe_newest_idx')]
+        indexes = [models.Index(
+            fields=('-created_at', '-id'), name='recipe_newest_idx')]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(cooking_time__gte=1),
@@ -87,7 +89,8 @@ class RecipeIngredient(models.Model):
         related_name='recipe_amounts',
         verbose_name='Ингредиент',
     )
-    amount = models.PositiveIntegerField('Количество', validators=[MinValueValidator(1)])
+    amount = models.PositiveIntegerField(
+        'Количество', validators=[MinValueValidator(1)])
 
     class Meta:
         ordering = ('id',)
@@ -95,10 +98,12 @@ class RecipeIngredient(models.Model):
         verbose_name_plural = 'Ингредиенты рецептов'
         constraints = [
             models.UniqueConstraint(
-                fields=('recipe', 'ingredient'), name='unique_recipe_ingredient'
+                fields=('recipe', 'ingredient'),
+                name='unique_recipe_ingredient'
             ),
             models.CheckConstraint(
-                condition=models.Q(amount__gte=1), name='positive_ingredient_amount'
+                condition=models.Q(amount__gte=1),
+                name='positive_ingredient_amount'
             ),
         ]
 
@@ -108,9 +113,11 @@ class RecipeIngredient(models.Model):
 
 class RecipeCollection(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name='Пользователь'
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        verbose_name='Пользователь'
     )
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, verbose_name='Рецепт')
+    recipe = models.ForeignKey(
+        Recipe, on_delete=models.CASCADE, verbose_name='Рецепт')
 
     class Meta:
         abstract = True

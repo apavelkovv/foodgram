@@ -10,7 +10,10 @@ from recipes.models import Ingredient, Tag
 
 
 class Command(BaseCommand):
-    help = 'Загрузить ингредиенты и теги из JSON; повторный запуск не создаёт дубликаты.'
+    help = (
+        'Загрузить ингредиенты и теги из JSON; '
+        'повторный запуск не создаёт дубликаты.'
+    )
 
     def add_arguments(self, parser):
         parser.add_argument('--data-dir', type=Path, default=settings.DATA_DIR)
@@ -29,12 +32,16 @@ class Command(BaseCommand):
                 objects = []
                 for record in records:
                     obj = model(**{field: record[field] for field in fields})
-                    obj.full_clean(validate_unique=False, validate_constraints=False)
+                    obj.full_clean(
+                        validate_unique=False, validate_constraints=False)
                     objects.append(obj)
-            except (OSError, ValueError, KeyError, TypeError, ValidationError) as error:
+            except (
+                OSError, ValueError, KeyError, TypeError, ValidationError
+            ) as error:
                 raise CommandError(f'{path}: {error}') from error
             before = model.objects.count()
             model.objects.bulk_create(objects, ignore_conflicts=True)
+            added = model.objects.count() - before
             self.stdout.write(
-                f'{model._meta.verbose_name_plural}: +{model.objects.count() - before}'
+                f'{model._meta.verbose_name_plural}: +{added}'
             )
