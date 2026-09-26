@@ -8,7 +8,10 @@ from users.models import Subscription, User
 class UserAdmin(DjangoUserAdmin):
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('email', 'username')
-    fieldsets = (*DjangoUserAdmin.fieldsets, ('Изображение', {'fields': ('avatar',)}))
+    fieldsets = (
+        *DjangoUserAdmin.fieldsets,
+        ('Изображение', {'fields': ('avatar',)}),
+    )
     add_fieldsets = (
         (
             None,

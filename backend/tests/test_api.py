@@ -10,7 +10,14 @@ from django.test import override_settings
 from PIL import Image
 from rest_framework.test import APITestCase
 
-from recipes.models import Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
+from recipes.models import (
+    Favorite,
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+    Tag,
+)
 from users.models import Subscription
 
 User = get_user_model()
@@ -55,8 +62,12 @@ class FoodgramTests(APITestCase):
         )
         cls.tag = Tag.objects.create(name='Завтрак', slug='breakfast')
         cls.other_tag = Tag.objects.create(name='Обед', slug='lunch')
-        cls.ingredient = Ingredient.objects.create(name='Сахар', measurement_unit='г')
-        cls.second = Ingredient.objects.create(name='Сахарная пудра', measurement_unit='г')
+        cls.ingredient = Ingredient.objects.create(
+            name='Сахар', measurement_unit='г'
+        )
+        cls.second = Ingredient.objects.create(
+            name='Сахарная пудра', measurement_unit='г'
+        )
         cls.recipe = Recipe.objects.create(
             author=cls.author,
             name='Первый рецепт',
@@ -65,7 +76,9 @@ class FoodgramTests(APITestCase):
             image='recipes/test.png',
         )
         cls.recipe.tags.add(cls.tag)
-        RecipeIngredient.objects.create(recipe=cls.recipe, ingredient=cls.ingredient, amount=5)
+        RecipeIngredient.objects.create(
+            recipe=cls.recipe, ingredient=cls.ingredient, amount=5
+        )
 
     def payload(self, **overrides):
         return dict(
@@ -93,15 +106,29 @@ class FoodgramTests(APITestCase):
         )
         result = self.client.post('/api/users/', data)
         self.assertEqual(result.status_code, 201, result.data)
-        self.assertEqual(set(result.data), {'id', 'email', 'username', 'first_name', 'last_name'})
-        self.assertTrue(User.objects.get(pk=result.data['id']).check_password(data['password']))
+        self.assertEqual(
+            set(result.data),
+            {'id', 'email', 'username', 'first_name', 'last_name'},
+        )
+        self.assertTrue(
+            User.objects.get(pk=result.data['id']).check_password(
+                data['password']
+            )
+        )
         result = self.client.post(
-            '/api/auth/token/login/', {'email': data['email'], 'password': data['password']}
+            '/api/auth/token/login/',
+            {'email': data['email'], 'password': data['password']},
         )
         self.assertEqual(result.status_code, 200)
-        self.client.credentials(HTTP_AUTHORIZATION='Token ' + result.data['auth_token'])
-        self.assertEqual(self.client.get('/api/users/me/').data['email'], data['email'])
-        self.assertEqual(self.client.post('/api/auth/token/logout/').status_code, 204)
+        self.client.credentials(
+            HTTP_AUTHORIZATION='Token ' + result.data['auth_token']
+        )
+        self.assertEqual(
+            self.client.get('/api/users/me/').data['email'], data['email']
+        )
+        self.assertEqual(
+            self.client.post('/api/auth/token/logout/').status_code, 204
+        )
         self.assertEqual(self.client.get('/api/users/me/').status_code, 401)
 
     def test_registration_requires_all_fields_and_unique_identity(self):
@@ -116,15 +143,30 @@ class FoodgramTests(APITestCase):
             with self.subTest(field=field):
                 incomplete = data.copy()
                 incomplete.pop(field)
-                self.assertEqual(self.client.post('/api/users/', incomplete).status_code, 400)
+                self.assertEqual(
+                    self.client.post('/api/users/', incomplete).status_code,
+                    400,
+                )
         for field in ('username', 'email'):
             duplicate = dict(data, **{field: getattr(self.author, field)})
-            self.assertEqual(self.client.post('/api/users/', duplicate).status_code, 400)
+            self.assertEqual(
+                self.client.post('/api/users/', duplicate).status_code, 400
+            )
 
     def test_public_reads_and_protected_actions(self):
-        for path in ('users/', f'users/{self.author.pk}/', 'recipes/', 'tags/', 'ingredients/'):
+        for path in (
+            'users/',
+            f'users/{self.author.pk}/',
+            'recipes/',
+            'tags/',
+            'ingredients/',
+        ):
             self.assertEqual(self.client.get('/api/' + path).status_code, 200)
-        for path in ('users/me/', 'users/subscriptions/', 'recipes/download_shopping_cart/'):
+        for path in (
+            'users/me/',
+            'users/subscriptions/',
+            'recipes/download_shopping_cart/',
+        ):
             self.assertEqual(self.client.get('/api/' + path).status_code, 401)
         for path in (
             f'users/{self.author.pk}/subscribe/',
@@ -132,21 +174,33 @@ class FoodgramTests(APITestCase):
             f'recipes/{self.recipe.pk}/shopping_cart/',
             'recipes/',
         ):
-            self.assertEqual(self.client.post('/api/' + path, {}, format='json').status_code, 401)
+            self.assertEqual(
+                self.client.post(
+                    '/api/' + path, {}, format='json'
+                ).status_code,
+                401,
+            )
 
     def test_change_password(self):
         self.login()
         endpoint = '/api/users/set_password/'
         self.assertEqual(
             self.client.post(
-                endpoint, {'current_password': 'wrong', 'new_password': 'Strong-Changed-937'}
+                endpoint,
+                {
+                    'current_password': 'wrong',
+                    'new_password': 'Strong-Changed-937',
+                },
             ).status_code,
             400,
         )
         self.assertEqual(
             self.client.post(
                 endpoint,
-                {'current_password': 'Secure-Recipe-486', 'new_password': 'Strong-Changed-937'},
+                {
+                    'current_password': 'Secure-Recipe-486',
+                    'new_password': 'Strong-Changed-937',
+                },
             ).status_code,
             204,
         )
@@ -155,28 +209,46 @@ class FoodgramTests(APITestCase):
 
     def test_avatar_validation_update_and_delete(self):
         self.login()
-        for bad in ('bad', 'data:image/png;base64,@@@', 'data:image/png;base64,aGVsbG8=', ''):
+        for bad in (
+            'bad',
+            'data:image/png;base64,@@@',
+            'data:image/png;base64,aGVsbG8=',
+            '',
+        ):
             self.assertEqual(
                 self.client.put(
                     '/api/users/me/avatar/', {'avatar': bad}, format='json'
                 ).status_code,
                 400,
             )
-        response = self.client.put('/api/users/me/avatar/', {'avatar': image_data()}, format='json')
+        response = self.client.put(
+            '/api/users/me/avatar/', {'avatar': image_data()}, format='json'
+        )
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertTrue(response.data['avatar'].startswith('http://testserver/media/'))
-        self.assertEqual(self.client.delete('/api/users/me/avatar/').status_code, 204)
+        self.assertTrue(
+            response.data['avatar'].startswith('http://testserver/media/')
+        )
+        self.assertEqual(
+            self.client.delete('/api/users/me/avatar/').status_code, 204
+        )
         self.assertIsNone(self.client.get('/api/users/me/').data['avatar'])
 
     def test_create_recipe_response_and_persistence(self):
         self.login()
-        result = self.client.post('/api/recipes/', self.payload(), format='json')
+        result = self.client.post(
+            '/api/recipes/', self.payload(), format='json'
+        )
         self.assertEqual(result.status_code, 201, result.data)
         self.assertEqual(result.data['author']['id'], self.author.pk)
         self.assertEqual(result.data['ingredients'][0]['amount'], 10)
         self.assertEqual(result.data['tags'][0]['slug'], 'breakfast')
         self.assertFalse(result.data['is_favorited'])
-        self.assertEqual(Recipe.objects.get(pk=result.data['id']).ingredient_amounts.count(), 1)
+        self.assertEqual(
+            Recipe.objects.get(
+                pk=result.data['id']
+            ).ingredient_amounts.count(),
+            1,
+        )
 
     def test_invalid_recipe_payloads_do_not_write(self):
         self.login()
@@ -195,27 +267,39 @@ class FoodgramTests(APITestCase):
         ]
         for data in invalid:
             with self.subTest(data=data):
-                response = self.client.post('/api/recipes/', self.payload(**data), format='json')
+                response = self.client.post(
+                    '/api/recipes/', self.payload(**data), format='json'
+                )
                 self.assertEqual(response.status_code, 400, response.data)
         self.assertEqual(Recipe.objects.count(), 1)
 
     def test_recipe_update_preserves_image_and_replaces_relations(self):
         self.login()
         data = self.payload(
-            tags=[self.other_tag.pk], ingredients=[{'id': self.second.pk, 'amount': 7}]
+            tags=[self.other_tag.pk],
+            ingredients=[{'id': self.second.pk, 'amount': 7}],
         )
         data.pop('image')
-        response = self.client.patch(f'/api/recipes/{self.recipe.pk}/', data, format='json')
+        response = self.client.patch(
+            f'/api/recipes/{self.recipe.pk}/', data, format='json'
+        )
         self.assertEqual(response.status_code, 200, response.data)
         self.recipe.refresh_from_db()
         self.assertEqual(self.recipe.image.name, 'recipes/test.png')
-        self.assertEqual(list(self.recipe.tags.values_list('pk', flat=True)), [self.other_tag.pk])
-        self.assertEqual(self.recipe.ingredient_amounts.get().ingredient_id, self.second.pk)
+        self.assertEqual(
+            list(self.recipe.tags.values_list('pk', flat=True)),
+            [self.other_tag.pk],
+        )
+        self.assertEqual(
+            self.recipe.ingredient_amounts.get().ingredient_id, self.second.pk
+        )
 
     def test_patch_required_fields_keep_existing_relations(self):
         self.login()
         response = self.client.patch(
-            f'/api/recipes/{self.recipe.pk}/', {'name': 'Другое'}, format='json'
+            f'/api/recipes/{self.recipe.pk}/',
+            {'name': 'Другое'},
+            format='json',
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(self.recipe.ingredient_amounts.get().amount, 5)
@@ -228,7 +312,11 @@ class FoodgramTests(APITestCase):
             side_effect=RuntimeError('failure'),
         ):
             with self.assertRaises(RuntimeError):
-                self.client.patch(f'/api/recipes/{self.recipe.pk}/', self.payload(), format='json')
+                self.client.patch(
+                    f'/api/recipes/{self.recipe.pk}/',
+                    self.payload(),
+                    format='json',
+                )
         self.recipe.refresh_from_db()
         self.assertEqual(self.recipe.name, 'Первый рецепт')
         self.assertEqual(self.recipe.ingredient_amounts.get().amount, 5)
@@ -237,7 +325,10 @@ class FoodgramTests(APITestCase):
         self.login(self.reader)
         endpoint = f'/api/recipes/{self.recipe.pk}/'
         self.assertEqual(
-            self.client.patch(endpoint, self.payload(), format='json').status_code, 403
+            self.client.patch(
+                endpoint, self.payload(), format='json'
+            ).status_code,
+            403,
         )
         self.assertEqual(self.client.delete(endpoint).status_code, 403)
         self.login()
@@ -253,7 +344,9 @@ class FoodgramTests(APITestCase):
         response = self.client.get(f'/s/{self.recipe.pk}/')
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, f'/recipes/{self.recipe.pk}')
-        self.assertEqual(self.client.get('/api/recipes/999999/get-link/').status_code, 404)
+        self.assertEqual(
+            self.client.get('/api/recipes/999999/get-link/').status_code, 404
+        )
 
     def test_pagination_order_and_tag_or_filter(self):
         for index in range(7):
@@ -269,19 +362,34 @@ class FoodgramTests(APITestCase):
         response = self.client.get('/api/recipes/')
         self.assertEqual(len(response.data['results']), 6)
         self.assertEqual(response.data['results'][0]['name'], 'Рецепт 6')
-        self.assertEqual(len(self.client.get('/api/recipes/?limit=2&page=2').data['results']), 2)
+        self.assertEqual(
+            len(
+                self.client.get('/api/recipes/?limit=2&page=2').data['results']
+            ),
+            2,
+        )
         response = self.client.get('/api/recipes/?tags=breakfast&tags=lunch')
         self.assertEqual(response.data['count'], 8)
-        response = self.client.get(f'/api/recipes/?tags=lunch&author={self.author.pk}')
+        response = self.client.get(
+            f'/api/recipes/?tags=lunch&author={self.author.pk}'
+        )
         self.assertEqual(response.data['count'], 1)
 
     def test_ingredient_search_cyrillic_prefix(self):
-        Ingredient.objects.create(name='Коричневый сахар', measurement_unit='г')
+        Ingredient.objects.create(
+            name='Коричневый сахар', measurement_unit='г'
+        )
         response = self.client.get('/api/ingredients/?name=САХ')
-        self.assertEqual({item['name'] for item in response.data}, {'Сахар', 'Сахарная пудра'})
+        self.assertEqual(
+            {item['name'] for item in response.data},
+            {'Сахар', 'Сахарная пудра'},
+        )
 
     def test_collections_status_codes_isolation_and_zero_filter(self):
-        for action, model in [('favorite', Favorite), ('shopping_cart', ShoppingCart)]:
+        for action, model in [
+            ('favorite', Favorite),
+            ('shopping_cart', ShoppingCart),
+        ]:
             with self.subTest(action=action):
                 self.login(self.reader)
                 endpoint = f'/api/recipes/{self.recipe.pk}/{action}/'
@@ -289,25 +397,50 @@ class FoodgramTests(APITestCase):
                 self.assertEqual(self.client.post(endpoint).status_code, 201)
                 self.assertEqual(self.client.post(endpoint).status_code, 400)
                 self.assertEqual(
-                    self.client.delete(f'/api/recipes/999999/{action}/').status_code, 404
+                    self.client.delete(
+                        f'/api/recipes/999999/{action}/'
+                    ).status_code,
+                    404,
                 )
-                flag = 'is_favorited' if action == 'favorite' else 'is_in_shopping_cart'
-                self.assertTrue(self.client.get(f'/api/recipes/{self.recipe.pk}/').data[flag])
-                self.assertEqual(self.client.get(f'/api/recipes/?{flag}=1').data['count'], 1)
+                flag = (
+                    'is_favorited'
+                    if action == 'favorite'
+                    else 'is_in_shopping_cart'
+                )
+                self.assertTrue(
+                    self.client.get(f'/api/recipes/{self.recipe.pk}/').data[
+                        flag
+                    ]
+                )
+                self.assertEqual(
+                    self.client.get(f'/api/recipes/?{flag}=1').data['count'], 1
+                )
                 self.login()
-                self.assertEqual(self.client.get(f'/api/recipes/?{flag}=1').data['count'], 0)
-                self.assertEqual(self.client.get(f'/api/recipes/?{flag}=0').data['count'], 1)
+                self.assertEqual(
+                    self.client.get(f'/api/recipes/?{flag}=1').data['count'], 0
+                )
+                self.assertEqual(
+                    self.client.get(f'/api/recipes/?{flag}=0').data['count'], 1
+                )
                 self.assertEqual(model.objects.count(), 1)
                 self.login(self.reader)
                 self.assertEqual(self.client.delete(endpoint).status_code, 204)
         self.client.force_authenticate(user=None)
-        self.assertEqual(self.client.get('/api/recipes/?is_favorited=1').data['count'], 0)
+        self.assertEqual(
+            self.client.get('/api/recipes/?is_favorited=1').data['count'], 0
+        )
 
     def test_shopping_file_sums_only_current_users_ingredients(self):
         other = Recipe.objects.create(
-            author=self.reader, name='Второй', text='Текст', cooking_time=1, image='test.png'
+            author=self.reader,
+            name='Второй',
+            text='Текст',
+            cooking_time=1,
+            image='test.png',
         )
-        RecipeIngredient.objects.create(recipe=other, ingredient=self.ingredient, amount=10)
+        RecipeIngredient.objects.create(
+            recipe=other, ingredient=self.ingredient, amount=10
+        )
         ShoppingCart.objects.create(user=self.reader, recipe=self.recipe)
         ShoppingCart.objects.create(user=self.reader, recipe=other)
         ShoppingCart.objects.create(user=self.author, recipe=self.recipe)
@@ -319,7 +452,9 @@ class FoodgramTests(APITestCase):
         self.login()
         self.assertIn(
             'Сахар (г) — 5',
-            self.client.get('/api/recipes/download_shopping_cart/').content.decode(),
+            self.client.get(
+                '/api/recipes/download_shopping_cart/'
+            ).content.decode(),
         )
 
     def test_subscription_lifecycle_and_limits(self):
@@ -327,7 +462,10 @@ class FoodgramTests(APITestCase):
         endpoint = f'/api/users/{self.author.pk}/subscribe/'
         self.assertEqual(self.client.delete(endpoint).status_code, 400)
         self.assertEqual(
-            self.client.post(f'/api/users/{self.reader.pk}/subscribe/').status_code, 400
+            self.client.post(
+                f'/api/users/{self.reader.pk}/subscribe/'
+            ).status_code,
+            400,
         )
         response = self.client.post(endpoint + '?recipes_limit=0')
         self.assertEqual(response.status_code, 201, response.data)
@@ -336,25 +474,36 @@ class FoodgramTests(APITestCase):
         self.assertTrue(response.data['is_subscribed'])
         self.assertEqual(self.client.post(endpoint).status_code, 400)
         self.assertEqual(
-            self.client.get('/api/users/subscriptions/?recipes_limit=1').data['count'], 1
+            self.client.get('/api/users/subscriptions/?recipes_limit=1').data[
+                'count'
+            ],
+            1,
         )
         for invalid in ('-1', 'abc', '1.5'):
             self.assertEqual(
-                self.client.get('/api/users/subscriptions/?recipes_limit=' + invalid).status_code,
+                self.client.get(
+                    '/api/users/subscriptions/?recipes_limit=' + invalid
+                ).status_code,
                 400,
             )
         self.login()
-        self.assertEqual(self.client.get('/api/users/subscriptions/').data['count'], 0)
+        self.assertEqual(
+            self.client.get('/api/users/subscriptions/').data['count'], 0
+        )
         self.login(self.reader)
         self.assertEqual(self.client.delete(endpoint).status_code, 204)
 
     def test_database_constraints(self):
         for create in (
-            lambda: Subscription.objects.create(subscriber=self.author, author=self.author),
+            lambda: Subscription.objects.create(
+                subscriber=self.author, author=self.author
+            ),
             lambda: RecipeIngredient.objects.create(
                 recipe=self.recipe, ingredient=self.second, amount=0
             ),
-            lambda: Recipe.objects.create(author=self.author, name='Bad', cooking_time=0),
+            lambda: Recipe.objects.create(
+                author=self.author, name='Bad', cooking_time=0
+            ),
         ):
             with self.assertRaises(IntegrityError), transaction.atomic():
                 create()
@@ -368,10 +517,16 @@ class FoodgramTests(APITestCase):
             self.client.get('/api/recipes/')
         for index in range(5):
             recipe = Recipe.objects.create(
-                author=self.reader, name=str(index), cooking_time=1, image='test.png', text='Текст'
+                author=self.reader,
+                name=str(index),
+                cooking_time=1,
+                image='test.png',
+                text='Текст',
             )
             recipe.tags.add(self.tag)
-            RecipeIngredient.objects.create(recipe=recipe, ingredient=self.ingredient, amount=1)
+            RecipeIngredient.objects.create(
+                recipe=recipe, ingredient=self.ingredient, amount=1
+            )
         with self.assertNumQueries(5):
             self.client.get('/api/recipes/')
 
@@ -382,7 +537,9 @@ class FoodgramTests(APITestCase):
         call_command('import_catalog', stdout=output)
         counts = Ingredient.objects.count(), Tag.objects.count()
         call_command('import_catalog', stdout=output)
-        self.assertEqual((Ingredient.objects.count(), Tag.objects.count()), counts)
+        self.assertEqual(
+            (Ingredient.objects.count(), Tag.objects.count()), counts
+        )
 
     def test_admin_recipe_pages(self):
         self.author.is_staff = self.author.is_superuser = True
