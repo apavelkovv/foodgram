@@ -12,7 +12,7 @@ if not SECRET_KEY:
     if not DEBUG:
         raise ImproperlyConfigured('Set SECRET_KEY or enable DEBUG locally.')
     SECRET_KEY = 'development-only-foodgram-key-do-not-use-in-production'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,food-gram.sytes.net').split(',')
 CSRF_TRUSTED_ORIGINS = list(filter(None, os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')))
 INSTALLED_APPS = [
     'django.contrib.admin',
