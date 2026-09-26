@@ -2,8 +2,7 @@ from django.contrib import admin
 from django.db.models import Count
 from django.forms.models import BaseInlineFormSet
 
-from recipes.models import (
-    Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag)
+from recipes.models import Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 
 
 @admin.register(Ingredient)

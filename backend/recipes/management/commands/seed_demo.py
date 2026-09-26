@@ -16,17 +16,13 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = (
-        'Создать трёх демонстрационных авторов и рецепты. '
-        'Пароль задаётся DEMO_PASSWORD.'
-    )
+    help = 'Создать трёх демонстрационных авторов и рецепты. Пароль задаётся DEMO_PASSWORD.'
 
     @transaction.atomic
     def handle(self, *args, **options):
         password = os.getenv('DEMO_PASSWORD')
         if not password:
-            raise CommandError(
-                'Задайте DEMO_PASSWORD; существующие пароли не меняются.')
+            raise CommandError('Задайте DEMO_PASSWORD; существующие пароли не меняются.')
         try:
             validate_password(password)
         except ValidationError as error:
@@ -35,13 +31,10 @@ class Command(BaseCommand):
         ingredient, _ = Ingredient.objects.get_or_create(
             name='Яйцо куриное', measurement_unit='шт.'
         )
-        salt, _ = Ingredient.objects.get_or_create(
-            name='Соль', measurement_unit='г')
+        salt, _ = Ingredient.objects.get_or_create(name='Соль', measurement_unit='г')
         tag = Tag.objects.get(slug='breakfast')
         for username, first_name, staff, title, color in [
-            (
-                'demo_admin', 'Администратор', True,
-                'Омлет с зеленью', '#ecb84e'),
+            ('demo_admin', 'Администратор', True, 'Омлет с зеленью', '#ecb84e'),
             ('demo_anna', 'Анна', False, 'Яйца на завтрак', '#e38856'),
             ('demo_ivan', 'Иван', False, 'Воздушный омлет', '#97b87a'),
         ]:
@@ -69,24 +62,19 @@ class Command(BaseCommand):
             recipe = Recipe.objects.create(
                 author=user,
                 name=title,
-                text=(
-                    'Взбейте яйца с солью. '
-                    'Готовьте на сковороде до готовности.'
-                ),
+                text=('Взбейте яйца с солью. Готовьте на сковороде до готовности.'),
                 cooking_time=10,
                 image=ContentFile(stream.getvalue(), name=f'{username}.png'),
             )
             recipe.tags.add(tag)
             RecipeIngredient.objects.bulk_create(
                 [
-                    RecipeIngredient(
-                        recipe=recipe, ingredient=ingredient, amount=2),
+                    RecipeIngredient(recipe=recipe, ingredient=ingredient, amount=2),
                     RecipeIngredient(recipe=recipe, ingredient=salt, amount=1),
                 ]
             )
         self.stdout.write(
             self.style.SUCCESS(
-                'Демо: demo_admin, demo_anna, demo_ivan '
-                '(email: <username>@example.com).'
+                'Демо: demo_admin, demo_anna, demo_ivan (email: <username>@example.com).'
             )
         )

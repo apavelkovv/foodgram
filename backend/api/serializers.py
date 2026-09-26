@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from djoser.serializers import (
-    UserCreateSerializer as DjoserUserCreateSerializer)
+from djoser.serializers import UserCreateSerializer as DjoserUserCreateSerializer
 from rest_framework import serializers
 
 from api.fields import Base64ImageField
@@ -13,8 +12,7 @@ User = get_user_model()
 class UserCreateSerializer(DjoserUserCreateSerializer):
     class Meta(DjoserUserCreateSerializer.Meta):
         model = User
-        fields = (
-            'id', 'email', 'username', 'first_name', 'last_name', 'password')
+        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'password')
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -22,9 +20,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = (
-            'id', 'email', 'username', 'first_name',
-            'last_name', 'is_subscribed', 'avatar')
+        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'is_subscribed', 'avatar')
         read_only_fields = fields
 
 
@@ -54,8 +50,7 @@ class SubscriptionSerializer(UserSerializer):
         limit = self.context.get('recipes_limit')
         if limit is not None:
             recipes = recipes[:limit]
-        return RecipeSummarySerializer(
-            recipes, many=True, context=self.context).data
+        return RecipeSummarySerializer(recipes, many=True, context=self.context).data
 
 
 class SubscriptionQuerySerializer(serializers.Serializer):
@@ -77,8 +72,7 @@ class IngredientSerializer(serializers.ModelSerializer):
 class IngredientAmountReadSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source='ingredient_id')
     name = serializers.CharField(source='ingredient.name')
-    measurement_unit = serializers.CharField(
-        source='ingredient.measurement_unit')
+    measurement_unit = serializers.CharField(source='ingredient.measurement_unit')
 
     class Meta:
         model = RecipeIngredient
@@ -86,8 +80,7 @@ class IngredientAmountReadSerializer(serializers.ModelSerializer):
 
 
 class IngredientAmountWriteSerializer(serializers.Serializer):
-    id = serializers.PrimaryKeyRelatedField(
-        queryset=Ingredient.objects.all(), source='ingredient')
+    id = serializers.PrimaryKeyRelatedField(queryset=Ingredient.objects.all(), source='ingredient')
     amount = serializers.IntegerField(min_value=1, max_value=2147483647)
 
 
@@ -98,8 +91,7 @@ class RecipeReadSerializer(serializers.ModelSerializer):
         source='ingredient_amounts', many=True, read_only=True
     )
     is_favorited = serializers.BooleanField(read_only=True, default=False)
-    is_in_shopping_cart = serializers.BooleanField(
-        read_only=True, default=False)
+    is_in_shopping_cart = serializers.BooleanField(read_only=True, default=False)
 
     class Meta:
         model = Recipe
@@ -127,16 +119,11 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Recipe
-        fields = (
-            'ingredients', 'tags', 'image', 'name', 'text', 'cooking_time'
-        )
+        fields = ('ingredients', 'tags', 'image', 'name', 'text', 'cooking_time')
 
     def validate(self, attrs):
         required = ('ingredients', 'tags', 'name', 'text', 'cooking_time')
-        missing = {
-            field: ['Обязательное поле.'] for field in required if
-            field not in attrs
-        }
+        missing = {field: ['Обязательное поле.'] for field in required if field not in attrs}
         if missing:
             raise serializers.ValidationError(missing)
         return attrs
@@ -147,11 +134,8 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return tags
 
     def validate_ingredients(self, ingredients):
-        if len(
-            {item['ingredient'].pk for item in ingredients}
-        ) != len(ingredients):
-            raise serializers.ValidationError(
-                'Ингредиенты не должны повторяться.')
+        if len({item['ingredient'].pk for item in ingredients}) != len(ingredients):
+            raise serializers.ValidationError('Ингредиенты не должны повторяться.')
         return ingredients
 
     @staticmethod
@@ -182,6 +166,5 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         from api.querysets import recipes_for_user
 
-        recipe = recipes_for_user(
-            self.context['request'].user).get(pk=instance.pk)
+        recipe = recipes_for_user(self.context['request'].user).get(pk=instance.pk)
         return RecipeReadSerializer(recipe, context=self.context).data
