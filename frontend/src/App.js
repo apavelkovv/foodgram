@@ -223,12 +223,9 @@ function App() {
         <div className="App">
           <Header orders={orders} loggedIn={loggedIn} onSignOut={onSignOut} />
           <Switch>
-            <Route
-              exact
-              path="/user/:id"
-              component={User}
-              updateOrders={updateOrders}
-            />
+            <Route exact path="/user/:id">
+              <User updateOrders={updateOrders} />
+            </Route>
             <ProtectedRoute
               exact
               path="/cart"
