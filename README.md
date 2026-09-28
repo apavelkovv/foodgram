@@ -7,7 +7,7 @@
 **Локальный адрес:** http://localhost/
 **Спецификация:** http://localhost/api/docs/
 **Админка:** http://localhost/admin/
-**Публичный адрес:** http://81.26.181.115:8080/
+**Публичный адрес:** https://food-gram.sytes.net/
 
 ## Стек и структура
 
@@ -85,14 +85,16 @@ SQLite-поиск по русским названиям выполняет case
 ## Проверки
 
 ```bash
-.venv/bin/ruff check backend
-.venv/bin/ruff format --check backend
+.venv/bin/flake8
 .venv/bin/python backend/manage.py check
 .venv/bin/python backend/manage.py makemigrations --check --dry-run
 .venv/bin/python backend/manage.py test tests --verbosity 2
 # Те же тесты на PostgreSQL контейнера:
 docker compose -f infra/docker-compose.yml exec --user foodgram backend python manage.py test tests --verbosity 2
 ```
+
+Flake8 проверяет код и тесты с лимитом 79 символов; автоматически созданные
+миграции исключены. Другие Python-линтеры не используются.
 
 Тесты создают и удаляют отдельную тестовую БД. Проверяются права, статусы ответов,
 регистрация и смена пароля, base64, обязательные поля PATCH, уникальность,
@@ -125,7 +127,8 @@ docker compose -f infra/docker-compose.yml exec --user foodgram backend python m
 
 Образы публикуются в Docker Hub: `apavelkov/foodgram-backend`,
 `apavelkov/foodgram-frontend`, `apavelkov/foodgram-nginx`.
-На сервере с другими проектами задайте свободный `HTTP_PORT`, например 8080.
+В production внутренний nginx доступен на `127.0.0.1:8080`. Внешний nginx
+обслуживает HTTPS на домене `food-gram.sytes.net` и передаёт запросы на этот порт.
 
 1. На сервере установите Docker/Compose. Откройте HTTP/HTTPS и настройте домен.
 2. Создайте каталог `~/foodgram`; скопируйте туда `docker-compose.production.yml`,
@@ -133,12 +136,13 @@ docker compose -f infra/docker-compose.yml exec --user foodgram backend python m
 3. В серверном `.env` обязательно задайте случайный `SECRET_KEY`, `DEBUG=False`,
    пароль PostgreSQL, `ALLOWED_HOSTS=<домен>,127.0.0.1,localhost,backend`,
    `CSRF_TRUSTED_ORIGINS=https://<домен>`, `USE_SQLITE=False`.
-4. Для TLS настройте внешний reverse proxy и сертификат. Внутренний nginx
-   сейчас обслуживает HTTP. Не включайте `HTTPS_ENABLED=True`, пока цепочка
-   proxy не передаёт корректный `X-Forwarded-Proto`: в TLS-терминирующем proxy
-   он должен перезаписываться, а во внутреннем nginx — передаваться из доверенного
-   proxy. Тогда включите `TRUST_PROXY=True`, `HTTPS_ENABLED=True` и закройте прямой
-   внешний доступ к внутреннему порту. Для запуска только по HTTP оставьте оба False.
+4. Внешний nginx завершает TLS и устанавливает
+   `proxy_set_header X-Forwarded-Proto $scheme;`, `proxy_set_header Host $http_host;`
+   и `client_max_body_size 20M;`. Внутренний nginx сохраняет признак HTTPS.
+   В серверном `.env`: `HTTPS_ENABLED=True`, `TRUST_PROXY=True`,
+   `HTTP_BIND=127.0.0.1`, `HTTP_PORT=8080`. Внешний доступ к внутреннему
+   порту закрыт привязкой к loopback. Для локальной разработки используйте
+   `infra/docker-compose.yml` и выключенные HTTPS-флаги.
 5. После push в main/master CI проверит код на PostgreSQL, соберёт React и
    опубликует три образа `<dockerhub-user>/foodgram-backend`, `-frontend`, `-nginx`
    с тегом SHA коммита и `latest`. Образы должны быть публичными либо
@@ -165,6 +169,6 @@ docker compose -f docker-compose.production.yml exec -T db sh -c 'pg_dump -U "$P
 
 Скрипт ждёт готовности сервисов, импортирует справочники и проверяет nginx.
 Откат образа сам по себе не отменяет миграции: для несовместимых миграций нужен
-проверенный план восстановления БД. После публикации замените строку публичного
-адреса в начале этого README и проверьте регистрацию, рецепт, загрузку файла,
+проверенный план восстановления БД. После публикации проверьте
+регистрацию, рецепт, загрузку файла,
 админку и сохранность данных после пересоздания контейнеров.

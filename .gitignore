@@ -141,7 +141,6 @@ dmypy.json
 static/
 media/
 backend/collected_static/
-.ruff_cache/
 .local-demo-credentials
 
 .production-demo-credentials

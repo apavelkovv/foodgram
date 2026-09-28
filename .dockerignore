@@ -12,6 +12,7 @@ backend/collected_static
 frontend/node_modules
 frontend/build
 .mypy_cache
-.ruff_cache
 
 .production-demo-credentials
+tests.yml
+tests.yaml

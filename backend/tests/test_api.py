@@ -26,8 +26,10 @@ User = get_user_model()
 def image_data():
     stream = BytesIO()
     Image.new('RGB', (8, 8), 'orange').save(stream, 'PNG')
-    return 'data:image/png;base64,'
-    +base64.b64encode(stream.getvalue()).decode()
+    return (
+        'data:image/png;base64,'
+        + base64.b64encode(stream.getvalue()).decode()
+    )
 
 
 class FoodgramTests(APITestCase):
@@ -551,3 +553,48 @@ class FoodgramTests(APITestCase):
             '/admin/users/user/',
         ):
             self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_favorite_tag_filter_with_pagination(self):
+        self.login(self.reader)
+        for index in range(3):
+            recipe = Recipe.objects.create(
+                author=self.author, name=f'Избранное {index}', text='Текст',
+                cooking_time=1, image='test.png',
+            )
+            recipe.tags.add(self.tag)
+            Favorite.objects.create(user=self.reader, recipe=recipe)
+        url = (
+            '/api/recipes/?is_favorited=1&tags=breakfast'
+            f'&author={self.author.pk}&limit=2'
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.data['count'], 3)
+        self.assertEqual(
+            [item['name'] for item in response.data['results']],
+            ['Избранное 2', 'Избранное 1'],
+        )
+        page = self.client.get(url + '&page=2')
+        self.assertEqual(page.data['results'][0]['name'], 'Избранное 0')
+        self.assertEqual(
+            self.client.get(url.replace('breakfast', 'lunch')).data['count'],
+            0,
+        )
+
+    @override_settings(
+        SECURE_SSL_REDIRECT=True,
+        SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO', 'https'),
+    )
+    def test_https_proxy_links_and_health(self):
+        response = self.client.get(
+            f'/api/recipes/{self.recipe.pk}/',
+            HTTP_X_FORWARDED_PROTO='https',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['image'].startswith('https://'))
+        response = self.client.get(
+            f'/api/recipes/{self.recipe.pk}/get-link/',
+            HTTP_X_FORWARDED_PROTO='https',
+        )
+        self.assertTrue(response.data['short-link'].startswith('https://'))
+        self.assertEqual(self.client.get('/health/').status_code, 200)
+        self.assertEqual(self.client.get('/api/recipes/').status_code, 301)

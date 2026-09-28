@@ -19,4 +19,4 @@ docker compose -f docker-compose.production.yml exec -T --user foodgram backend 
 docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate nginx
 docker compose -f docker-compose.production.yml exec -T nginx nginx -t
 
-docker compose -f docker-compose.production.yml exec -T nginx wget -q -O /dev/null http://127.0.0.1/api/tags/
+docker compose -f docker-compose.production.yml exec -T nginx wget -q --header='X-Forwarded-Proto: https' -O /dev/null http://127.0.0.1/api/tags/

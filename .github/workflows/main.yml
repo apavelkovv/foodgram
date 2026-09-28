@@ -37,11 +37,11 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements*.txt
       - run: pip install -r backend/requirements-dev.txt
-      - run: flake8 backend
+      - run: flake8
       - run: python backend/manage.py check
       - run: python backend/manage.py makemigrations --check --dry-run
       - run: python backend/manage.py test tests --verbosity 2
-      - run: cp .env.example .env && docker compose -f infra/docker-compose.yml config --quiet
+      - run: cp .env.example .env && docker compose -f infra/docker-compose.yml config --quiet && docker compose -f docker-compose.production.yml config --quiet
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
