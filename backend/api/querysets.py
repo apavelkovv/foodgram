@@ -1,10 +1,13 @@
-from django.contrib.auth import get_user_model
 from django.db.models import BooleanField, Exists, OuterRef, Prefetch, Value
 
-from recipes.models import Favorite, Recipe, RecipeIngredient, ShoppingCart
+from recipes.models import (
+    Favorite,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+    User,
+)
 from users.models import Subscription
-
-User = get_user_model()
 
 
 def users_for_user(user):

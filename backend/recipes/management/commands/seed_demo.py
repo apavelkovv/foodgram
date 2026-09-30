@@ -1,7 +1,6 @@
 import os
 from io import BytesIO
 
-from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -10,14 +9,20 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from PIL import Image, ImageDraw
 
-from recipes.models import Ingredient, Recipe, RecipeIngredient, Tag
-
-User = get_user_model()
+from recipes.models import (
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    Tag,
+    User,
+)
 
 
 class Command(BaseCommand):
-    help = 'Создать трёх демонстрационных авторов и рецепты. '
-    'Пароль задаётся DEMO_PASSWORD.'
+    help = (
+        'Создать трёх демонстрационных авторов и рецепты. '
+        'Пароль задаётся DEMO_PASSWORD.'
+    )
 
     @transaction.atomic
     def handle(self, *args, **options):

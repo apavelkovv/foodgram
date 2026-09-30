@@ -1,11 +1,12 @@
-from django.contrib.auth import get_user_model
-from django.db import connection
+from http import HTTPStatus
+
+from django.db import DatabaseError, connection
 from django.db.models import Count, Prefetch, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from djoser.views import UserViewSet as DjoserUserViewSet
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import MethodNotAllowed, ValidationError
 from rest_framework.permissions import (
@@ -28,6 +29,7 @@ from api.serializers import (
     SubscriptionSerializer,
     TagSerializer,
 )
+from api.utils import format_shopping_list
 from recipes.models import (
     Favorite,
     Ingredient,
@@ -37,8 +39,6 @@ from recipes.models import (
     Tag,
 )
 from users.models import Subscription
-
-User = get_user_model()
 
 
 class UserViewSet(DjoserUserViewSet):
@@ -81,7 +81,7 @@ class UserViewSet(DjoserUserViewSet):
                     'recipes', queryset=recipes, to_attr='subscription_recipes'
                 ),
             )
-        return queryset.order_by('id')
+        return queryset.order_by('username')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -108,7 +108,7 @@ class UserViewSet(DjoserUserViewSet):
         if request.method == 'DELETE':
             request.user.avatar = ''
             request.user.save(update_fields=['avatar'])
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(status=HTTPStatus.NO_CONTENT)
         serializer = AvatarSerializer(
             request.user,
             data=request.data,
@@ -133,18 +133,11 @@ class UserViewSet(DjoserUserViewSet):
 
     @action(
         detail=True,
-        methods=['post', 'delete'],
+        methods=['post'],
         permission_classes=[IsAuthenticated],
     )
     def subscribe(self, request, **kwargs):
         author = self.get_object()
-        if request.method == 'DELETE':
-            deleted, _ = Subscription.objects.filter(
-                subscriber=request.user, author=author
-            ).delete()
-            if not deleted:
-                raise ValidationError('Вы не подписаны на этого автора.')
-            return Response(status=status.HTTP_204_NO_CONTENT)
         if author == request.user:
             raise ValidationError('Нельзя подписаться на себя.')
         _, created = Subscription.objects.get_or_create(
@@ -157,8 +150,18 @@ class UserViewSet(DjoserUserViewSet):
             SubscriptionSerializer(
                 author, context=self.get_serializer_context()
             ).data,
-            status=201,
+            status=HTTPStatus.CREATED,
         )
+
+    @subscribe.mapping.delete
+    def unsubscribe(self, request, **kwargs):
+        author = self.get_object()
+        deleted, _ = Subscription.objects.filter(
+            subscriber=request.user, author=author
+        ).delete()
+        if not deleted:
+            raise ValidationError('Вы не подписаны на этого автора.')
+        return Response(status=HTTPStatus.NO_CONTENT)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
@@ -210,15 +213,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
             }
         )
 
-    def change_collection(self, request, pk, model):
+    def add_to_collection(self, request, pk, model):
         recipe = get_object_or_404(Recipe, pk=pk)
-        if request.method == 'DELETE':
-            deleted, _ = model.objects.filter(
-                user=request.user, recipe=recipe
-            ).delete()
-            if not deleted:
-                raise ValidationError('Рецепт отсутствует в списке.')
-            return Response(status=status.HTTP_204_NO_CONTENT)
         _, created = model.objects.get_or_create(
             user=request.user, recipe=recipe
         )
@@ -228,24 +224,41 @@ class RecipeViewSet(viewsets.ModelViewSet):
             RecipeSummarySerializer(
                 recipe, context=self.get_serializer_context()
             ).data,
-            status=201,
+            status=HTTPStatus.CREATED,
         )
+
+    def remove_from_collection(self, request, pk, model):
+        recipe = get_object_or_404(Recipe, pk=pk)
+        deleted, _ = model.objects.filter(
+            user=request.user, recipe=recipe
+        ).delete()
+        if not deleted:
+            raise ValidationError('Рецепт отсутствует в списке.')
+        return Response(status=HTTPStatus.NO_CONTENT)
 
     @action(
         detail=True,
-        methods=['post', 'delete'],
+        methods=['post'],
         permission_classes=[IsAuthenticated],
     )
     def favorite(self, request, pk=None):
-        return self.change_collection(request, pk, Favorite)
+        return self.add_to_collection(request, pk, Favorite)
+
+    @favorite.mapping.delete
+    def remove_favorite(self, request, pk=None):
+        return self.remove_from_collection(request, pk, Favorite)
 
     @action(
         detail=True,
-        methods=['post', 'delete'],
+        methods=['post'],
         permission_classes=[IsAuthenticated],
     )
     def shopping_cart(self, request, pk=None):
-        return self.change_collection(request, pk, ShoppingCart)
+        return self.add_to_collection(request, pk, ShoppingCart)
+
+    @shopping_cart.mapping.delete
+    def remove_shopping_cart(self, request, pk=None):
+        return self.remove_from_collection(request, pk, ShoppingCart)
 
     @action(
         detail=False, methods=['get'], permission_classes=[IsAuthenticated]
@@ -264,14 +277,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
             .annotate(total=Sum('amount'))
             .order_by('ingredient__name')
         )
-        lines = ['Список покупок', '']
-        lines.extend(
-            f'{item["ingredient__name"]} '
-            f'({item["ingredient__measurement_unit"]}) — {item["total"]}'
-            for item in ingredients
-        )
         response = HttpResponse(
-            '\n'.join(lines) + '\n',
+            format_shopping_list(ingredients),
             content_type='text/plain; charset=utf-8',
         )
         response['Content-Disposition'] = (
@@ -286,7 +293,16 @@ def recipe_short_link(request, pk):
 
 
 def health(request):
-    with connection.cursor() as cursor:
-        cursor.execute('SELECT 1')
-        cursor.fetchone()
+    return JsonResponse({'status': 'ok'})
+
+
+def readiness(request):
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
+    except DatabaseError:
+        return JsonResponse(
+            {'status': 'unavailable'}, status=HTTPStatus.SERVICE_UNAVAILABLE
+        )
     return JsonResponse({'status': 'ok'})

@@ -146,4 +146,4 @@ SECURE_SSL_REDIRECT = SESSION_COOKIE_SECURE
 if os.getenv('TRUST_PROXY', 'False').lower() == 'true':
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-SECURE_REDIRECT_EXEMPT = [r'^health/$']
+SECURE_REDIRECT_EXEMPT = [r'^(health|livez|readyz)/$']

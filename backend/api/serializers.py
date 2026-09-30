@@ -1,4 +1,3 @@
-from django.contrib.auth import get_user_model
 from django.db import transaction
 from djoser.serializers import (
     UserCreateSerializer as DjoserUserCreateSerializer,
@@ -6,9 +5,20 @@ from djoser.serializers import (
 from rest_framework import serializers
 
 from api.fields import Base64ImageField
-from recipes.models import Ingredient, Recipe, RecipeIngredient, Tag
-
-User = get_user_model()
+from api.querysets import recipes_for_user
+from recipes.constants import (
+    MAX_COOKING_TIME,
+    MAX_INGREDIENT_AMOUNT,
+    MIN_COOKING_TIME,
+    MIN_INGREDIENT_AMOUNT,
+)
+from recipes.models import (
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    Tag,
+    User,
+)
 
 
 class UserCreateSerializer(DjoserUserCreateSerializer):
@@ -63,12 +73,8 @@ class SubscriptionSerializer(UserSerializer):
         fields = (*UserSerializer.Meta.fields, 'recipes', 'recipes_count')
 
     def get_recipes(self, author):
-        recipes = author.subscription_recipes
-        limit = self.context.get('recipes_limit')
-        if limit is not None:
-            recipes = recipes[:limit]
         return RecipeSummarySerializer(
-            recipes, many=True, context=self.context
+            author.subscription_recipes, many=True, context=self.context
         ).data
 
 
@@ -104,7 +110,9 @@ class IngredientAmountWriteSerializer(serializers.Serializer):
     id = serializers.PrimaryKeyRelatedField(
         queryset=Ingredient.objects.all(), source='ingredient'
     )
-    amount = serializers.IntegerField(min_value=1, max_value=2147483647)
+    amount = serializers.IntegerField(
+        min_value=MIN_INGREDIENT_AMOUNT, max_value=MAX_INGREDIENT_AMOUNT
+    )
 
 
 class RecipeReadSerializer(serializers.ModelSerializer):
@@ -140,7 +148,9 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         queryset=Tag.objects.all(), many=True, allow_empty=False
     )
     image = Base64ImageField()
-    cooking_time = serializers.IntegerField(min_value=1, max_value=2147483647)
+    cooking_time = serializers.IntegerField(
+        min_value=MIN_COOKING_TIME, max_value=MAX_COOKING_TIME
+    )
 
     class Meta:
         model = Recipe
@@ -204,8 +214,6 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return instance
 
     def to_representation(self, instance):
-        from api.querysets import recipes_for_user
-
         recipe = recipes_for_user(self.context['request'].user).get(
             pk=instance.pk
         )

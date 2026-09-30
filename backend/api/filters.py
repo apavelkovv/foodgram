@@ -5,12 +5,8 @@ from recipes.models import Ingredient, Recipe, Tag
 
 
 class RecipeFilter(filters.FilterSet):
-    is_favorited = filters.ChoiceFilter(
-        choices=(('0', 'Нет'), ('1', 'Да')), method='filter_collection'
-    )
-    is_in_shopping_cart = filters.ChoiceFilter(
-        choices=(('0', 'Нет'), ('1', 'Да')), method='filter_collection'
-    )
+    is_favorited = filters.BooleanFilter(method='filter_collection')
+    is_in_shopping_cart = filters.BooleanFilter(method='filter_collection')
     tags = filters.ModelMultipleChoiceFilter(
         field_name='tags__slug',
         to_field_name='slug',
@@ -22,7 +18,7 @@ class RecipeFilter(filters.FilterSet):
         fields = ('author', 'tags')
 
     def filter_collection(self, queryset, name, value):
-        return queryset.filter(**{name: True}) if value == '1' else queryset
+        return queryset.filter(**{name: True}) if value else queryset
 
 
 class IngredientFilter(filters.FilterSet):

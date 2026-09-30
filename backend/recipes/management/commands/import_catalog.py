@@ -10,8 +10,10 @@ from recipes.models import Ingredient, Tag
 
 
 class Command(BaseCommand):
-    help = 'Загрузить ингредиенты и теги из JSON; '
-    'повторный запуск не создаёт дубликаты.'
+    help = (
+        'Загрузить ингредиенты и теги из JSON; '
+        'повторный запуск не создаёт дубликаты.'
+    )
 
     def add_arguments(self, parser):
         parser.add_argument('--data-dir', type=Path, default=settings.DATA_DIR)
